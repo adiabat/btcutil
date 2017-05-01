@@ -11,9 +11,7 @@ import (
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcutil/base58"
-	"github.com/btcsuite/fastsha256"
 	"github.com/btcsuite/golangcrypto/ripemd160"
 )
 
@@ -126,22 +124,7 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 		return nil, errors.New("decoded address is of unknown format")
 	}
 
-	// Native segregated witness addresses begin with an extra 2-byte
-	// header composed of: a witnessVersion byte + padding byte before the
-	// witness program itself.
-	const (
-		witAddrHeader = 2
-		p2wshSize     = witAddrHeader + 32
-		p2wkhSize     = witAddrHeader + 20
-	)
-
 	switch len(decoded) {
-	case p2wshSize:
-		scriptHash := decoded[2:]
-		return newAddressWitnessScriptHashFromHash(scriptHash, netID)
-	case p2wkhSize:
-		hash160 := decoded[2:]
-		return newAddressWitnessPubKeyHash(hash160, netID)
 	case ripemd160.Size: // P2PKH or P2SH
 		isP2PKH := chaincfg.IsPubKeyHashAddrID(netID)
 		isP2SH := chaincfg.IsScriptHashAddrID(netID)
@@ -416,141 +399,4 @@ func (a *AddressPubKey) AddressPubKeyHash() *AddressPubKeyHash {
 // PubKey returns the underlying public key for the address.
 func (a *AddressPubKey) PubKey() *btcec.PublicKey {
 	return a.pubKey
-}
-
-// AddressWitnessPubKeyHash is an Address for a pay-to-witness-pubkey-hash
-// (P2WPKH) output. See BIP 142 for further details regarding native segregated
-// witness transactions: https://github.com/bitcoin/bips/blob/master/bip-0142.mediawiki
-type AddressWitnessPubKeyHash struct {
-	pubKeyHash     [ripemd160.Size]byte
-	netID          byte
-	witnessVersion byte
-}
-
-// NewAddressWitnessPubKeyHash returns a new AddressWitnessPubKeyHash. The
-// passed pkHash parameter must be exactly 20 bytes.
-func NewAddressWitnessPubKeyHash(pkHash []byte, net *chaincfg.Params) (*AddressWitnessPubKeyHash, error) {
-	return newAddressWitnessPubKeyHash(pkHash, net.WitnessPubKeyHashAddrID)
-}
-
-// newAddressWitnessPubKeyHash is an internal helper function to create a
-// witness pubkey has address with a known leading identifier byte for a
-// network, rather than looking it up through its paramters. This is useful
-// when creating a new addess struct from a string encoding where the identifier
-// byte is already known.
-func newAddressWitnessPubKeyHash(pkHash []byte, netID byte) (*AddressWitnessPubKeyHash, error) {
-	// Check for a valid pubkey hash length.
-	if len(pkHash) != ripemd160.Size {
-		return nil, errors.New("pkHash must be 20 bytes")
-	}
-
-	addr := &AddressWitnessPubKeyHash{
-		netID:          netID,
-		witnessVersion: 0x00,
-	}
-	copy(addr.pubKeyHash[:], pkHash)
-
-	return addr, nil
-}
-
-// EncodeAddress returns the string encoding of a pay-to-witness-pubkey-hash
-// address. Part of the Address interface.
-func (a *AddressWitnessPubKeyHash) EncodeAddress() string {
-	return encodeSegWitAddress(a.pubKeyHash[:], a.netID, a.witnessVersion)
-}
-
-// ScriptAddress returns the bytes to be included in a txout script to pay
-// to a witness pubkey hash. Part of the Address interface.
-func (a *AddressWitnessPubKeyHash) ScriptAddress() []byte {
-	return a.pubKeyHash[:]
-}
-
-// IsForNet returns whether or not the pay-to-witness-pubkey-hash address is
-// associated with the passed bitcoin network. Part of the Address interface.
-func (a *AddressWitnessPubKeyHash) IsForNet(net *chaincfg.Params) bool {
-	return a.netID == net.WitnessPubKeyHashAddrID
-}
-
-// String returns a human-readable string for the pay-to-witness-pubkey-hash
-// address. This is equivalent to calling EncodeAddress, but is provided so
-// the type can be used as a fmt.Stringer. Part of the interface.
-func (a *AddressWitnessPubKeyHash) String() string {
-	return a.EncodeAddress()
-}
-
-// Hash160 returns the underlying array of the pubkey hash. This can be useful
-// when an array is more appropriate than a slice (for example, when used as map
-// keys).
-func (a *AddressWitnessPubKeyHash) Hash160() *[ripemd160.Size]byte {
-	return &a.pubKeyHash
-}
-
-// AddressWitnessScriptHash is an address for a pay-to-witness-script-hash
-// (P2WSH) output.
-type AddressWitnessScriptHash struct {
-	scriptHash     [chainhash.HashSize]byte
-	netID          byte
-	witnessVersion byte
-}
-
-// NewAddressWitnessScriptHash is an Address for a pay-to-witness-script-hash
-// (P2WSH) output. See BIP 142 for further details concerning native segregated
-// witness transactions: https://github.com/bitcoin/bips/blob/master/bip-0142.mediawiki
-func NewAddressWitnessScriptHash(serializedScript []byte,
-	net *chaincfg.Params) (*AddressWitnessScriptHash, error) {
-
-	scriptHash := fastsha256.Sum256(serializedScript)
-	return newAddressWitnessScriptHashFromHash(scriptHash[:], net.WitnessScriptHashAddrID)
-}
-
-// NewAddressWitnessScriptHashFromHash returns a new AddressWitnessScriptHash.
-// scriptHash must be 32 bytes.
-func NewAddressWitnessScriptHashFromHash(scriptHash []byte,
-	net *chaincfg.Params) (*AddressWitnessScriptHash, error) {
-
-	return newAddressWitnessScriptHashFromHash(scriptHash, net.WitnessScriptHashAddrID)
-}
-
-// newAddressWitnessScriptHashFromHash is an internal helper function used to
-// create a witness script hash address with a known leading identifer for a
-// network, rather than looking it up through its paramters. This is useful
-// when creating a new address struct from a string encoding where the identifer
-// byte is already known.
-func newAddressWitnessScriptHashFromHash(scriptHash []byte,
-	netID byte) (*AddressWitnessScriptHash, error) {
-
-	// Check for a valid script hash length.
-	if len(scriptHash) != chainhash.HashSize {
-		return nil, errors.New("scriptHash must be 32 bytes")
-	}
-
-	addr := &AddressWitnessScriptHash{netID: netID, witnessVersion: 0x00}
-	copy(addr.scriptHash[:], scriptHash)
-
-	return addr, nil
-}
-
-// EncodeAddress returns the string encoding of a pay-to-witness-script-hash
-// address. Part of the Address interface.
-func (a *AddressWitnessScriptHash) EncodeAddress() string {
-	return encodeSegWitAddress(a.scriptHash[:], a.netID, a.witnessVersion)
-}
-
-// ScriptAddress returns the bytes to be included in a txout script to pay to
-// witness script hash. Part of the Address interface.
-func (a *AddressWitnessScriptHash) ScriptAddress() []byte {
-	return a.scriptHash[:]
-}
-
-// IsForNet returns whether or not the pay-to-witness-script-hash address is
-// associated with the passed bitcoin network. Part of the Address interface.
-func (a *AddressWitnessScriptHash) IsForNet(net *chaincfg.Params) bool {
-	return a.netID == net.WitnessScriptHashAddrID
-}
-
-// String returns a human-readable string for the pay-to-witness-script-hash
-// address. This is equivalent to calling EncodeAddress, but is provided so the
-// type can be used as a fmt.Stringer. Part of the interface.
-func (a *AddressWitnessScriptHash) String() string {
-	return a.EncodeAddress()
 }
