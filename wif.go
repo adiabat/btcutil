@@ -42,7 +42,7 @@ type WIF struct {
 
 	// netID is the bitcoin network identifier byte used when
 	// WIF encoding the private key.
-	netID byte
+	NetID byte
 }
 
 // NewWIF creates a new WIF structure to export an address and its private key
@@ -59,7 +59,7 @@ func NewWIF(privKey *btcec.PrivateKey, net *chaincfg.Params, compress bool) (*WI
 // IsForNet returns whether or not the decoded WIF structure is associated
 // with the passed bitcoin network.
 func (w *WIF) IsForNet(net *chaincfg.Params) bool {
-	return w.netID == net.PrivateKeyID
+	return w.NetID == net.PrivateKeyID
 }
 
 // DecodeWIF creates a new WIF structure by decoding the string encoding of
@@ -135,7 +135,7 @@ func (w *WIF) String() string {
 	}
 
 	a := make([]byte, 0, encodeLen)
-	a = append(a, w.netID)
+	a = append(a, w.NetID)
 	// Pad and append bytes manually, instead of using Serialize, to
 	// avoid another call to make.
 	a = paddedAppend(btcec.PrivKeyBytesLen, a, w.PrivKey.D.Bytes())

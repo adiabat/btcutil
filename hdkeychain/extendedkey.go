@@ -23,6 +23,7 @@ import (
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/base58"
+	"github.com/mit-dci/lit/coinparam"
 )
 
 const (
@@ -450,7 +451,7 @@ func (k *ExtendedKey) Zero() {
 // will derive to an unusable secret key.  The ErrUnusable error will be
 // returned if this should occur, so the caller must check for it and generate a
 // new seed accordingly.
-func NewMaster(seed []byte, net *chaincfg.Params) (*ExtendedKey, error) {
+func NewMaster(seed []byte, net *coinparam.Params) (*ExtendedKey, error) {
 	// Per [BIP32], the seed must be in range [MinSeedBytes, MaxSeedBytes].
 	if len(seed) < MinSeedBytes || len(seed) > MaxSeedBytes {
 		return nil, ErrInvalidSeedLen
